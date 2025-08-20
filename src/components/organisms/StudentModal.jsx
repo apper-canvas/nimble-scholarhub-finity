@@ -87,8 +87,8 @@ const StudentModal = ({ isOpen, onClose, student, onSave, mode = "create" }) => 
     }
   };
 
-  return (
-    <AnimatePresence>
+return (
+    <AnimatePresence mode="wait">
       {isOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
@@ -96,14 +96,16 @@ const StudentModal = ({ isOpen, onClose, student, onSave, mode = "create" }) => 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               className="fixed inset-0 transition-opacity bg-black/20 backdrop-blur-sm"
               onClick={onClose}
             />
 
-            <motion.div
+<motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle bg-white shadow-xl rounded-2xl transform transition-all"
             >
               <div className="flex items-center justify-between mb-6">
