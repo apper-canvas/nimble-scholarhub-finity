@@ -1,85 +1,264 @@
-import attendanceData from "@/services/mockData/attendance.json";
+import { toast } from 'react-toastify';
 
-let attendance = [...attendanceData];
-
-const delay = () => new Promise(resolve => setTimeout(resolve, Math.random() * 300 + 200));
+const tableName = 'attendance_c';
 
 export const attendanceService = {
   async getAll() {
-    await delay();
-    return [...attendance];
+    try {
+      const { ApperClient } = window.ApperSDK;
+      const apperClient = new ApperClient({
+        apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
+        apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
+      });
+      
+      const params = {
+        fields: [
+          { field: { Name: "Name" } },
+          { field: { Name: "date_c" } },
+          { field: { Name: "status_c" } },
+          { field: { Name: "notes_c" } },
+          { field: { Name: "student_id_c" } }
+        ]
+      };
+      
+      const response = await apperClient.fetchRecords(tableName, params);
+      
+      if (!response.success) {
+        console.error(response.message);
+        toast.error(response.message);
+        return [];
+      }
+      
+      if (!response.data || response.data.length === 0) {
+        return [];
+      }
+      
+      // Map database fields to UI format
+      return response.data.map(record => ({
+        Id: record.Id,
+        date: record.date_c || new Date().toISOString(),
+        status: record.status_c || 'Present',
+        notes: record.notes_c || '',
+        studentId: record.student_id_c?.Id?.toString() || ''
+      }));
+    } catch (error) {
+      if (error?.response?.data?.message) {
+        console.error("Error fetching attendance:", error?.response?.data?.message);
+      } else {
+        console.error(error);
+      }
+      return [];
+    }
   },
 
   async getById(id) {
-    await delay();
-    const record = attendance.find(a => a.Id === parseInt(id));
-    if (!record) {
-      throw new Error("Attendance record not found");
+    try {
+      const { ApperClient } = window.ApperSDK;
+      const apperClient = new ApperClient({
+        apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
+        apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
+      });
+      
+      const params = {
+        fields: [
+          { field: { Name: "Name" } },
+          { field: { Name: "date_c" } },
+          { field: { Name: "status_c" } },
+          { field: { Name: "notes_c" } },
+          { field: { Name: "student_id_c" } }
+        ]
+      };
+      
+      const response = await apperClient.getRecordById(tableName, parseInt(id), params);
+      
+      if (!response || !response.data) {
+        return null;
+      }
+      
+      const record = response.data;
+      return {
+        Id: record.Id,
+        date: record.date_c || new Date().toISOString(),
+        status: record.status_c || 'Present',
+        notes: record.notes_c || '',
+        studentId: record.student_id_c?.Id?.toString() || ''
+      };
+    } catch (error) {
+      if (error?.response?.data?.message) {
+        console.error(`Error fetching attendance record with ID ${id}:`, error?.response?.data?.message);
+      } else {
+        console.error(error);
+      }
+      return null;
     }
-    return { ...record };
-  },
-
-  async getByStudentId(studentId) {
-    await delay();
-    return attendance
-      .filter(a => a.studentId === studentId.toString())
-      .map(a => ({ ...a }));
-  },
-
-  async getByDate(date) {
-    await delay();
-    const targetDate = new Date(date).toISOString().split("T")[0];
-    return attendance
-      .filter(a => new Date(a.date).toISOString().split("T")[0] === targetDate)
-      .map(a => ({ ...a }));
   },
 
   async create(attendanceData) {
-    await delay();
-    const newRecord = {
-      Id: Math.max(...attendance.map(a => a.Id)) + 1,
-      ...attendanceData
-    };
-    attendance.push(newRecord);
-    return { ...newRecord };
+    try {
+      const { ApperClient } = window.ApperSDK;
+      const apperClient = new ApperClient({
+        apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
+        apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
+      });
+      
+      const params = {
+        records: [{
+          Name: `Attendance ${attendanceData.status}`,
+          date_c: attendanceData.date || new Date().toISOString(),
+          status_c: attendanceData.status || 'Present',
+          notes_c: attendanceData.notes || '',
+          student_id_c: parseInt(attendanceData.studentId)
+        }]
+      };
+      
+      const response = await apperClient.createRecord(tableName, params);
+      
+      if (!response.success) {
+        console.error(response.message);
+        toast.error(response.message);
+        return null;
+      }
+      
+      if (response.results) {
+        const successfulRecords = response.results.filter(result => result.success);
+        const failedRecords = response.results.filter(result => !result.success);
+        
+        if (failedRecords.length > 0) {
+          console.error(`Failed to create attendance ${failedRecords.length} records:${JSON.stringify(failedRecords)}`);
+          
+          failedRecords.forEach(record => {
+            record.errors?.forEach(error => {
+              toast.error(`${error.fieldLabel}: ${error}`);
+            });
+            if (record.message) toast.error(record.message);
+          });
+        }
+        
+        if (successfulRecords.length > 0) {
+          const createdRecord = successfulRecords[0].data;
+          return {
+            Id: createdRecord.Id,
+            date: createdRecord.date_c || new Date().toISOString(),
+            status: createdRecord.status_c || 'Present',
+            notes: createdRecord.notes_c || '',
+            studentId: createdRecord.student_id_c?.Id?.toString() || ''
+          };
+        }
+      }
+    } catch (error) {
+      if (error?.response?.data?.message) {
+        console.error("Error creating attendance:", error?.response?.data?.message);
+      } else {
+        console.error(error);
+      }
+    }
+    return null;
   },
 
   async update(id, attendanceData) {
-    await delay();
-    const index = attendance.findIndex(a => a.Id === parseInt(id));
-    if (index === -1) {
-      throw new Error("Attendance record not found");
+    try {
+      const { ApperClient } = window.ApperSDK;
+      const apperClient = new ApperClient({
+        apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
+        apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
+      });
+      
+      const params = {
+        records: [{
+          Id: parseInt(id),
+          Name: `Attendance ${attendanceData.status}`,
+          date_c: attendanceData.date,
+          status_c: attendanceData.status,
+          notes_c: attendanceData.notes,
+          student_id_c: parseInt(attendanceData.studentId)
+        }]
+      };
+      
+      const response = await apperClient.updateRecord(tableName, params);
+      
+      if (!response.success) {
+        console.error(response.message);
+        toast.error(response.message);
+        return null;
+      }
+      
+      if (response.results) {
+        const successfulUpdates = response.results.filter(result => result.success);
+        const failedUpdates = response.results.filter(result => !result.success);
+        
+        if (failedUpdates.length > 0) {
+          console.error(`Failed to update attendance ${failedUpdates.length} records:${JSON.stringify(failedUpdates)}`);
+          
+          failedUpdates.forEach(record => {
+            record.errors?.forEach(error => {
+              toast.error(`${error.fieldLabel}: ${error}`);
+            });
+            if (record.message) toast.error(record.message);
+          });
+        }
+        
+        if (successfulUpdates.length > 0) {
+          const updatedRecord = successfulUpdates[0].data;
+          return {
+            Id: updatedRecord.Id,
+            date: updatedRecord.date_c || new Date().toISOString(),
+            status: updatedRecord.status_c || 'Present',
+            notes: updatedRecord.notes_c || '',
+            studentId: updatedRecord.student_id_c?.Id?.toString() || ''
+          };
+        }
+      }
+    } catch (error) {
+      if (error?.response?.data?.message) {
+        console.error("Error updating attendance:", error?.response?.data?.message);
+      } else {
+        console.error(error);
+      }
     }
-    attendance[index] = { ...attendance[index], ...attendanceData };
-    return { ...attendance[index] };
+    return null;
   },
 
   async delete(id) {
-    await delay();
-    const index = attendance.findIndex(a => a.Id === parseInt(id));
-    if (index === -1) {
-      throw new Error("Attendance record not found");
-    }
-    const deletedRecord = attendance.splice(index, 1)[0];
-    return { ...deletedRecord };
-  },
-
-  async markAttendance(studentId, date, status, notes = "") {
-    await delay();
-    const existingRecord = attendance.find(a => 
-      a.studentId === studentId.toString() && 
-      new Date(a.date).toISOString().split("T")[0] === new Date(date).toISOString().split("T")[0]
-    );
-
-    if (existingRecord) {
-      return await this.update(existingRecord.Id, { status, notes });
-    } else {
-      return await this.create({
-        studentId: studentId.toString(),
-        date: new Date(date).toISOString(),
-        status,
-        notes
+    try {
+      const { ApperClient } = window.ApperSDK;
+      const apperClient = new ApperClient({
+        apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
+        apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
       });
+      
+      const params = {
+        RecordIds: [parseInt(id)]
+      };
+      
+      const response = await apperClient.deleteRecord(tableName, params);
+      
+      if (!response.success) {
+        console.error(response.message);
+        toast.error(response.message);
+        return false;
+      }
+      
+      if (response.results) {
+        const successfulDeletions = response.results.filter(result => result.success);
+        const failedDeletions = response.results.filter(result => !result.success);
+        
+        if (failedDeletions.length > 0) {
+          console.error(`Failed to delete attendance ${failedDeletions.length} records:${JSON.stringify(failedDeletions)}`);
+          
+          failedDeletions.forEach(record => {
+            if (record.message) toast.error(record.message);
+          });
+        }
+        
+        return successfulDeletions.length > 0;
+      }
+    } catch (error) {
+      if (error?.response?.data?.message) {
+        console.error("Error deleting attendance:", error?.response?.data?.message);
+      } else {
+        console.error(error);
+      }
     }
+    return false;
   }
 };
